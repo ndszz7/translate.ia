@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Conversor de Texto Inteligente</title>
+  <style>
+    :root {
+      --bg-dark: linear-gradient(to right, #0f2027, #203a43, #2c5364);
+      --bg-light: linear-gradient(to right, #e0eafc, #cfdef3);
+      --text-dark: #ffffff;
+      --text-light: #111111;
+      --accent: #00aaff;
+    }
+
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: var(--bg-dark);
+      color: var(--text-dark);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: start;
+      min-height: 100vh;
+      padding: 30px 15px;
+      transition: all 0.5s ease;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 700px;
+      background: rgba(255,255,255,0.05);
+      padding: 30px;
+      border-radius: 20px;
+      box-shadow: 0 0 15px rgba(0,0,0,0.4);
+      backdrop-filter: blur(6px);
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: bold;
+      margin-bottom: 20px;
+      white-space: nowrap;
+      overflow: hidden;
+      border-right: 3px solid var(--accent);
+      animation: typing 3s steps(30, end), blink 0.7s infinite;
+    }
+
+    @keyframes typing {
+      from { width: 0 }
+      to { width: 100% }
+    }
+
+    @keyframes blink {
+      50% { border-color: transparent }
+    }
+
+    textarea {
+      width: 100%;
+      height: 120px;
+      border-radius: 10px;
+      border: none;
+      padding: 15px;
+      font-size: 16px;
+      resize: none;
+      background-color: rgba(255,255,255,0.1);
+      color: inherit;
+      margin-bottom: 15px;
+      outline: none;
+    }
+
+    button {
+      padding: 10px 20px;
+      margin: 5px 4px;
+      font-size: 14px;
+      font-weight: bold;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+
+    .btn-primary { background-color: #007bff; color: white; }
+    .btn-success { background-color: #28a745; color: white; }
+    .btn-danger { background-color: #dc3545; color: white; }
+    .btn-export { background-color: #ffc107; color: black; }
+
+    button:hover {
+      transform: scale(1.05);
+      opacity: 0.9;
+    }
+
+    .linha {
+      margin-top: 10px;
+      padding: 10px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 10px;
+    }
+
+    .linha p {
+      margin: 0;
+    }
+
+    .linha span {
+      display: block;
+      opacity: 0.8;
+    }
+
+    .theme-toggle {
+      position: fixed;
+      top: 15px;
+      right: 15px;
+      background: var(--accent);
+      color: white;
+      padding: 10px;
+      border: none;
+      border-radius: 50%;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    @media(max-width: 600px) {
+      h1 {
+        font-size: 22px;
+      }
+
+      .container {
+        padding: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <button class="theme-toggle" onclick="toggleTheme()">🌓</button>
+
+  <div class="container">
+    <h1 id="typing">Conversor de Texto Inteligente</h1>
+    <textarea id="inputTexto" placeholder="Digite ou cole o texto aqui..."></textarea>
+    <div>
+      <button class="btn-success" onclick="processarTexto()">Formatar Texto</button>
+      <button class="btn-primary" onclick="transformarTudoMaiusculo()">MAIÚSCULO</button>
+      <button class="btn-danger" onclick="transformarTudoMinusculo()">minúsculo</button>
+      <button class="btn-export" onclick="exportarTexto()">⬇️ Exportar .txt</button>
+      <button class="btn-primary" onclick="copiarTexto()">📋 Copiar Texto</button>
+    </div>
+    <div style="margin-top: 10px;">
+      <label for="idioma">Traduzir para:</label>
+      <select id="idioma">
+        <option value="pt">Português</option>
+        <option value="en">Inglês</option>
+        <option value="es">Espanhol</option>
+        <option value="fr">Francês</option>
+      </select>
+      <button onclick="traduzirTexto()" class="btn-primary">Traduzir</button>
+    </div>
+    <div id="container"></div>
+  </div>
+
+  <script>
+    const nomesProprios = [
+      "Deus", "Jesus", "Maria", "José", "João", "Pedro",
+      "Brasil", "Portugal", "França", "Itália", "Argentina",
+      "Google", "TikTok", "Facebook", "Amazon", "Microsoft",
+      "Rio de Janeiro", "São Paulo"
+    ];
+  
+    // Corrige pontuação e ortografia com LanguageTool + pós-processamento
+    async function processarTexto() {
+      const texto = document.getElementById("inputTexto").value;
+  
+      const response = await fetch("http://127.0.0.1:5000/corrigir", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ texto })
+      });
+  
+      const resultado = await response.json();
+      let textoCorrigido = resultado.corrigido || "";
+  
+      // Corrige início de frases e nomes próprios
+      textoCorrigido = textoCorrigido
+        .split("\n")
+        .map(linha => corrigirMaiusculas(linha))
+        .join("\n");
+  
+      const container = document.getElementById("container");
+      container.innerHTML = "";
+  
+      textoCorrigido.split("\n").forEach(linha => {
+        if (linha.trim()) {
+          const div = document.createElement("div");
+          div.className = "linha";
+          div.innerHTML = `<p>${linha}</p>`;
+          container.appendChild(div);
+        }
+      });
+    }
+  
+    function corrigirMaiusculas(linha) {
+      linha = linha.trim();
+      if (linha.length === 0) return "";
+  
+      // Letra inicial da frase
+      linha = linha.charAt(0).toUpperCase() + linha.slice(1);
+  
+      // Corrigir nomes próprios
+      nomesProprios.forEach(nome => {
+        const regex = new RegExp(`\\b${nome.toLowerCase()}\\b`, "gi");
+        linha = linha.replace(regex, nome);
+      });
+  
+      return linha;
+    }
+  
+    function transformarTudoMaiusculo() {
+      exibirTextoOriginal(l => corrigirMaiusculas(l.toUpperCase()));
+    }
+  
+    function transformarTudoMinusculo() {
+      exibirTextoOriginal(l => corrigirMaiusculas(l.toLowerCase()));
+    }
+  
+    function exibirTextoOriginal(transformacao) {
+      const container = document.getElementById("container");
+      container.innerHTML = "";
+      const texto = document.getElementById("inputTexto").value;
+      const linhas = texto.split("\n");
+  
+      linhas.forEach(linha => {
+        if (linha.trim() !== "") {
+          const linhaTransformada = transformacao(linha);
+          const divLinha = document.createElement("div");
+          divLinha.className = "linha";
+          divLinha.innerHTML = `<p>${linhaTransformada}</p>`;
+          container.appendChild(divLinha);
+        }
+      });
+    }
+  
+    function exportarTexto() {
+      const container = document.getElementById("container");
+      let textoFinal = '';
+      container.querySelectorAll('.linha').forEach(div => {
+        textoFinal += div.textContent + '\n';
+      });
+  
+      const blob = new Blob([textoFinal], { type: "text/plain" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "texto_convertido.txt";
+      link.click();
+    }
+  
+    async function traduzirTexto() {
+      const idioma = document.getElementById("idioma").value;
+      const texto = document.getElementById("inputTexto").value;
+  
+      const response = await fetch("http://127.0.0.1:5000/traduzir", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ texto, idioma })
+      });
+  
+      const resultado = await response.json();
+      const original = resultado.original || [];
+      const traduzido = resultado.traduzido || [];
+  
+      const container = document.getElementById("container");
+      container.innerHTML = "";
+  
+      for (let i = 0; i < original.length; i++) {
+        if (original[i].trim() === "") continue;
+        const div = document.createElement("div");
+        div.className = "linha";
+        div.innerHTML = `<p><strong>${original[i]}</strong><br><span>${traduzido[i]}</span></p>`;
+        container.appendChild(div);
+      }
+    }
+  
+    function toggleTheme() {
+      const body = document.body;
+      const isDark = body.style.background.includes("0f2027");
+      body.style.background = isDark ? "var(--bg-light)" : "var(--bg-dark)";
+      body.style.color = isDark ? "var(--text-light)" : "var(--text-dark)";
+    }
+  </script>
+  
